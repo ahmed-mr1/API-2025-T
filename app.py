@@ -1,4 +1,5 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
@@ -29,7 +30,7 @@ def create_course_item(name):
             new_course_item={"name": request_data["name"], "type": request_data["type"]}
             specialization["course_items"].append(new_course_item)
             return new_course_item, 201
-        return{"message":"Specialization not found"}, 404
+    return{"message":"Specialization not found"}, 404
     
 
 @app.get("/specialization/<string:name>")
@@ -37,7 +38,7 @@ def get_specialization(name):
     for specialization in specializations:
         if specialization["name"] == name:
             return {"specialization": specialization}
-        return{"message":"Specialization not found"}, 404
+    return{"message":"Specialization not found"}, 404
     
 
 @app.get("/specialization/<string:name>/course_item")
@@ -45,4 +46,5 @@ def get_course_item(name):
     for specialization in specializations:
         if specialization["name"] == name:
             return {"course_items":specialization["course_items"]}
-        return{"message":"Specialization not found"}, 404
+    return{"message":"Specialization not found"}, 404
+
