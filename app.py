@@ -48,3 +48,31 @@ def get_course_item(name):
             return {"course_items":specialization["course_items"]}
     return{"message":"Specialization not found"}, 404
 
+@app.put("/specialization/<string:name>")
+def update_specialization(name):
+    request_data = request.get_json()
+    for specialization in specializations:
+        if specialization["name"] == name:
+            specialization["name"] = request_data["name"]
+            return specialization
+    return {"message":"Specalization not found"}, 404
+
+@app.delete("/specialization/<string:name>")
+def delete_specialization(name):
+    for specialization in specializations:
+        if specialization["name"] == name:
+            specializations.remove(specialization)
+            return {"message": "Specialization deleted"}
+    return {"message":"Specalization not found"}, 404
+
+@app.delete("/specialization/<string:specialization_name>/<string:course_name>")
+def delete_course_item(specialization_name,course_name):
+    for specialization in specializations:
+        if specialization["name"] == specialization_name:
+            for course in specialization["course_items"]:
+                if course["name"] == course_name:
+                    specialization["course_items"].remove(course)
+                    return {"message":"Course item deleted"}
+            return {"message":"Course not found"}, 404
+    return {"message":"Specialization not found"}, 404
+                
