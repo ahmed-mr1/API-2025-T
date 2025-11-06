@@ -1,83 +1,121 @@
-from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, request, abort
+from uuid import uuid4
+from db import specializations, course_items
+
 
 app = Flask(__name__)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:<YOUR_PASSWORD>@localhost:5432/postgres"
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db = SQLAlchemy(app)
-
-specializations = [
-    {
-        "name": "IT",
-        "course_items": [{"name": "Web Services", "Type": "Mandatory"}]
-    }
-]
+# SPECIALIZATION ENDPOINTS
 
 @app.get("/specialization")
 def get_specializations():
-    return {"specializations": specializations}
+    return {"specializations": list(specializations.values())}
+
 
 @app.post("/specialization")
-def create_specializations():
-    request_data=request.get_json()
-    new_specialization={"name": request_data["name"], "course_items":[]}
-    specializations.append(new_specialization)
+def create_specialization():
+    data = request.get_json()
+    new_id = uuid4().hex
+    for specialization in specializations:
+        if specializations[specialization]["name"] == data["name"]:
+            abort(400, description="Specialization already exists")
+    
+    new_specialization = {"id": new_id, "name": data["name"]}
+    specializations[new_id] = new_specialization
     return new_specialization, 201
 
 
-@app.post("/specialization/<string:name>/course_item")
-def create_course_item(name):
-    request_data=request.get_json()
-    for specialization in specializations:
-        if specialization["name"]==name:
-            new_course_item={"name": request_data["name"], "type": request_data["type"]}
-            specialization["course_items"].append(new_course_item)
-            return new_course_item, 201
-    return{"message":"Specialization not found"}, 404
+@app.get("/specialization/<string:specialization_id>")
+def get_specialization(specialization_id):
+    try:
+        return specializations[specialization_id]
+    except KeyError:
+        abort(404, description="Specialization not found")
+
+
+@app.put("/specialization/<string:specialization_id>")
+def update_specialization(specialization_id):
+    data = request.get_json()
+    if specialization_id not in specializations:
+        abort(404, description="Specialization not found")
+    if not data or "name" not in data:
+        abort(400, description="Bad request. 'name' is required")
+    if specializations[specialization_id]["name"] == data["name"]:
+        abort(400, description="Specialization name already exists")
+    specializations[specialization_id]["name"] = data["name"]
+    return specializations[specialization_id]
     
 
-@app.get("/specialization/<string:name>")
-def get_specialization(name):
-    for specialization in specializations:
-        if specialization["name"] == name:
-            return {"specialization": specialization}
-    return{"message":"Specialization not found"}, 404
+@app.delete("/specialization/<string:specialization_id>")
+def delete_specialization(specialization_id):
+    try:
+        del specializations[specialization_id]
+        return {"message": "Specialization deleted"}
+    except KeyError:
+        abort(404, description="Specialization not found")
+
+
+
+# COURSE ITEM ENDPOINTS
+
+
+@app.get("/course_item")
+def get_course_items():
+    return {"course_items": list(course_items.values())}
+
+
+@app.post("/course_item")
+def create_course_item():
+    data = request.get_json()
+    specialization_id = data.get("specialization_id")
+    if specialization_id not in specializations:
+        abort(404, description="Specialization not found")
+    else:
+        new_id = str(uuid4().hex)
+        for course in course_items:
+            if course_items[course]["name"] == data["name"]:
+                abort(400, description="Course item already exists")
+        new_course_item = {
+            "id": new_id,
+            "name": data["name"],
+            "type": data["type"],
+            "specialization_id": specialization_id
+        }
+        course_items[new_id] = new_course_item
+        return new_course_item, 201
+
+
+@app.get("/course_item/<string:course_id>")
+def get_course_item(course_id):
+    try:
+        return {"course_item": course_items[course_id]}
+    except KeyError:
+        abort(400, description="Course is not found")
+
+    
+@app.put("/course_item/<string:course_id>")
+def update_course_item(course_id):
+    data = request.get_json()
+    if course_id not in course_items:
+        abort(404, description="Course is not found")
+    if not data or "name" not in data or "type" not in data:
+        abort(400, description="The fields 'name' and 'type' are required")
+    course_items[course_id]["name"] = data["name"]
+    course_items[course_id]["type"] = data["type"]
+    return course_items[course_id]
     
 
-@app.get("/specialization/<string:name>/course_item")
-def get_course_item(name):
-    for specialization in specializations:
-        if specialization["name"] == name:
-            return {"course_items":specialization["course_items"]}
-    return{"message":"Specialization not found"}, 404
 
-@app.put("/specialization/<string:name>")
-def update_specialization(name):
-    request_data = request.get_json()
-    for specialization in specializations:
-        if specialization["name"] == name:
-            specialization["name"] = request_data["name"]
-            return specialization
-    return {"message":"Specalization not found"}, 404
+@app.delete("/course_item/<string:course_id>")
+def delete_course_item(course_id):
+    try:
+        del course_items[course_id]
+        return {"message": "Course item deleted"}
+    except KeyError:
+        abort(404, description="Course item is not found")
 
-@app.delete("/specialization/<string:name>")
-def delete_specialization(name):
-    for specialization in specializations:
-        if specialization["name"] == name:
-            specializations.remove(specialization)
-            return {"message": "Specialization deleted"}
-    return {"message":"Specalization not found"}, 404
 
-@app.delete("/specialization/<string:specialization_name>/<string:course_name>")
-def delete_course_item(specialization_name,course_name):
-    for specialization in specializations:
-        if specialization["name"] == specialization_name:
-            for course in specialization["course_items"]:
-                if course["name"] == course_name:
-                    specialization["course_items"].remove(course)
-                    return {"message":"Course item deleted"}
-            return {"message":"Course not found"}, 404
-    return {"message":"Specialization not found"}, 404
-                
+if __name__ == "__main__":
+    app.run(debug=True)
+
