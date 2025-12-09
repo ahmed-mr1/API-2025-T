@@ -2,15 +2,20 @@ from flask import Flask
 from flask_smorest import Api
 from db import db
 import os
-import models  # Ensure models are imported for SQLAlchemy
+import models  
 from resources.course_item import blp as CourseItemBlueprint
 from resources.specialization import blp as SpecializationBlueprint
+from resources.users import blp as UsersBlueprint
+
+from flask_jwt_extended import JWTManager
 
 
 def create_app(db_url=None):
 
 
     app = Flask(__name__)
+    app.config["JWT_SECRET_KEY"] = "9a71c0f9306e9308fe38e7f8afe3d828" 
+    jwt = JWTManager(app)
 
 
 # Flask-Smorest / Swagger configuration
@@ -39,6 +44,7 @@ def create_app(db_url=None):
 # Register blueprints
     api.register_blueprint(CourseItemBlueprint)
     api.register_blueprint(SpecializationBlueprint)
+    api.register_blueprint(UsersBlueprint)
 
     return app
 

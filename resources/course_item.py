@@ -4,6 +4,7 @@ from schemas import Course_ItemSchema, Course_ItemUpdateSchema
 from models.course_item import CourseItemModel
 from models.specialization import SpecializationModel
 from db import db
+from flask_jwt_extended import jwt_required, get_jwt
 
 
 blp = Blueprint("Course_Items", __name__, description="Operations on course_items")
@@ -12,6 +13,7 @@ blp = Blueprint("Course_Items", __name__, description="Operations on course_item
 @blp.route("/course_item/<string:course_item_id>")
 class Course_Item(MethodView):
     @blp.response(200, Course_ItemSchema)
+    @jwt_required()
     def get(self, course_item_id):
         course_item = CourseItemModel.query.filter_by(course_item_id=course_item_id).first()
         if not course_item:
@@ -19,7 +21,12 @@ class Course_Item(MethodView):
         return course_item
 
     @blp.response(200)
+    @jwt_required()
     def delete(self, course_item_id):
+        claims = get_jwt()
+        role = claims["role"]
+        if role != "Head" and role != "Admin":
+            abort(403, message="Admins/Head Of Departments only can delete specializations")
         course_item = CourseItemModel.query.filter_by(course_item_id=course_item_id).first()
         if not course_item:
             abort(404, message="Course_Item not found.")
@@ -29,10 +36,19 @@ class Course_Item(MethodView):
 
     @blp.arguments(Course_ItemUpdateSchema)
     @blp.response(200, Course_ItemSchema)
+    @jwt_required()
     def put(self, course_item_data, course_item_id):
+        claims = get_jwt()
+        role = claims["role"]
+        if role != "Head" and role != "Admin":
+            abort(403, message="Admins/Head Of Departments only can delete specializations")
         course_item = CourseItemModel.query.filter_by(course_item_id=course_item_id).first()
         if not course_item:
             abort(404, message="Course_Item not found.")
+
+        
+        if "course_item_id" in course_item_data:
+            del course_item_data["course_item_id"]
 
         for key, value in course_item_data.items():
             setattr(course_item, key, value)
@@ -45,19 +61,24 @@ class Course_Item(MethodView):
 @blp.route("/course_item")
 class ItemList(MethodView):
     @blp.response(200, Course_ItemSchema(many=True))
+    @jwt_required()
     def get(self):
         return CourseItemModel.query.all()
 
     @blp.arguments(Course_ItemSchema)
     @blp.response(201, Course_ItemSchema)
+    @jwt_required()
     def post(self, course_item_data):
-        # Accept specialization_id as UUID string; resolve to internal integer id
+        claims = get_jwt()
+        role = claims["role"]
+        if role != "Head" and role != "Admin":
+            abort(403, message="Admins/Head Of Departments only can delete specializations")
         spec_uuid = course_item_data.get("specialization_id")
         spec = SpecializationModel.query.filter_by(specialization_id=spec_uuid).first()
         if not spec:
             abort(400, message="Specialization not found.")
 
-        # Prevent duplicate course item for the same specialization
+        
         existing = CourseItemModel.query.filter_by(
             name=course_item_data.get("name"),
             specialization_id=spec.id,
@@ -65,7 +86,7 @@ class ItemList(MethodView):
         if existing:
             abort(400, message="Course_Item already exists for this specialization.")
 
-        # Replace external specialization_id (UUID) with internal DB id
+        
         course_item_data["specialization_id"] = spec.id
 
         course_item = CourseItemModel(**course_item_data)
